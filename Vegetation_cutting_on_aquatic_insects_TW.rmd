@@ -1,0 +1,1569 @@
+---
+title: Effects of macrophytes mowing on aquatic insect communities in an urbanized wetland ecosystem
+author: "Pin-Yuan Chen | Winter 2023"
+date: "Jan 2023"
+output:
+  html_document:
+    df_print: paged
+  word_document: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+# Load package
+```{r message = FALSE}
+library(rethinking)
+library(dagitty)
+library(ellipse)
+library(knitr)
+library(tidyr)
+# set_cmdstan_path('C:/Users/judy8/AppData/Local/R/win-library/4.2/cmdstan-2.31.0')
+load('C:/Users/judy8/Box/PhD_UCD/UCD_course/Fall_2022/ECL298_Bayesian_models/Vegetation_cutting_on_aquatic_insects.RData')
+par(mfrow = c(1,1), mar = c(5, 4, 4, 2) + 0.1)
+```
+
+# Introduction
+## Background
+Urbanization results in loss and fragmentation of natural wetlands and much research has focused on how to enhance freshwater biodiversity in urban ecosystems through vegetation management (Oertli & Parris, 2019). Aquatic insects are also often used to evaluate local biodiversity in urban ecosystems (Hill et al., 2017).
+
+Vegetation cutting removes or reduces the height of emergent macrophytes and changes vegetation structure. The change of vegetation structure could cause direct effects on aquatic insects (Briggs et al., 2019; Hershey et al., 2010). On the other hand, the alteration of vegetation structure could also indirectly impact aquatic insects. Vegetation cutting might alter the microclimate (i.e., water quality factors) and the change of water quality then impacts aquatic insects (Chen et al., 2020; Hershey et al., 2010).
+
+Many studies have shown significant direct and indirect effects of vegetation cutting on aquatic insects (Chen et al., 2020; da Conceição et al., 2020). However, how the direct and indirect effects of vegetation cutting vary across seasons and how does the presence of emergent macrophytes impact the relationship between water quality factors and aquatic insects remain unclear in small lentic urbanized ecosystems under subtropical climate zones. To determine the impacts of vegetation cutting and how it impacts aquatic insects across seasons and water quality gradients in urbanized subtropical wetlands, we conducted paired treatment experiments (with/ without vegetation cutting) across spring, summer, and fall in an urbanized wetland located in Southeast Asia. In addition, during the sampling period, the following water quality factors were also monitored: water temperature, water pH, and dissolved oxygen.
+
+## Scientific questions and hypotheses
+
+To fill the knowledge gaps, we focus on the following questions: in an urbanized wetland,
+
+1)  what are the impacts of vegetation cutting on the abundance of aquatic insects?
+2)  If the impacts of vegetation cutting are significant, how does vegetation cutting influence aquatic insect communities? Is it a direct impact or though affecting water quality factors (i.e., water temperature, water pH, and dissolved oxygen)?
+3)  How does vegetation cutting influence the relationships between aquatic insect abundance and water quality factors?
+4)  Last, due to the hot and warm subtropical climate, how do the impacts of vegetation cutting vary over time?
+
+The hypothetical causal relationships among macrophytes, water quality factors, and aquatic insect abundance is shown in the figure below, where *M* represents macrophytes, *W* refers to water pH, *Tem* represents water temperature, *D* represents dissolved oxygen, *A* refers to aquatic insect abundance (count of individual), and *Fam* refers to aquatic insect families.
+
+```{r echo=FALSE, out.width='70%'}
+dag3 <- dagitty('dag{
+                  M[exposure]
+                  A[outcome]
+                  U[unknown]
+                  Fam -> A
+                  M -> A 
+                  M -> W
+                  M -> Tem -> A
+                  M -> Tem -> D -> A
+                  Tem -> U -> D
+                  M -> D -> A
+                  M -> W -> A
+                  }')
+coordinates(dag3) <- list(x = c(M = 0, A = 2, Tem = 1, W = 1, D = 2, Fam = 2.5, U = 1.5), 
+                            y = c(M = 0, A = 0, Tem = 1, W = -1, D = 1, Fam = 0, U = 1.5))
+plot(graphLayout(dag3))
+# drawdag(dag3)
+```
+
+```{r echo=FALSE, results='hide'}
+# 1) what are the impacts of vegetation cutting on the abundance of aquatic insects?
+a <- adjustmentSets(dag3, exposure = 'M', outcome = 'A', effect = 'total')
+paste('Total effects of macrophytes on aquatic insect abundance', a)
+```
+
+```{r echo=FALSE, results='hide'}
+# 2) how does vegetation cutting influence aquatic insect communities? Is it a direct impact or though affecting local water quality factors (i.e., water temperature, water pH, and dissolved oxygen)? 
+
+a <- adjustmentSets(dag3, exposure = 'M', outcome = 'A', effect = c('direct')) #
+paste('direct effects of macrophytes on abundance:', a)
+
+a <- adjustmentSets(dag3, exposure = 'M', outcome = 'W', effect = c('direct'))
+paste('direct effects of macrophytes on water pH:', a)
+
+a <- adjustmentSets(dag3, exposure = 'M', outcome = 'Tem', effect = c('direct'))
+paste('direct effects of macrophytes on water temperature:', a)
+
+a <- adjustmentSets(dag3, exposure = 'M', outcome = 'D', effect = c('direct'))
+paste('direct effects of macrophytes on dissolved oxygen:', a)
+
+
+a <- adjustmentSets(dag3, exposure = 'W', outcome = 'A', effect = c('direct'))
+paste('direct effects of water pH on abundance:', a)
+
+a <- adjustmentSets(dag3, exposure = 'Tem', outcome = 'A', effect = c('direct'))
+paste('direct effects of water temperature on abundance:', a)
+
+a <- adjustmentSets(dag3, exposure = 'D', outcome = 'A', effect = c('direct'))
+paste('direct effects of dissolved oxygen on abundance:', a)
+
+# a <- adjustmentSets(dag3, exposure = 'Tem', outcome = 'W', effect = c('direct'))
+# paste('direct effects of water temperature on water pH:', a)
+
+a <- adjustmentSets(dag3, exposure = 'Tem', outcome = 'D', effect = c('total'))
+paste('total effects of water temperature on dissolved oxygen:', a)
+```
+
+# Methods
+## Experimental design and data collection
+
+The research was conducted at an urbanized wetland located in Southeast Asia. Among this wetland, three ponds were selected, and we performed paired treatment experiments in each pond. Namely, there were two experimental units within each pond. One unit had applied vegetation cutting (i.e., without emergent macrophytes) while the other had not (i.e., with emergent macrophytes). In each experimental unit, aquatic insects were collected within an enclosed cylinder. Water quality factors, such as water temperature (°C), water pH, conductivity (mS/ cm), and dissolved oxygen (mg/ L), were sampled using a portable multiparameter.
+
+## Statistical analysis
+### Load and standerdize data
+```{r message = FALSE, echo=FALSE, results='hide'}
+# load("C:/Users/judy8/Box/PhD_UCD/UCD_course/Fall_2022/ECL298_Bayesian_models/Aqu_ins_environment_Nest.RData")
+setwd('C:/Users/judy8/Box/MS_NTU/Thesis/Raw Data_2018')
+aqu_ins <- read.csv('2018_larvae.csv')
+str(aqu_ins)
+
+unique(aqu_ins$Family)
+```
+
+```{r echo=FALSE}
+# Standerdize data
+# aqu_ins$A <- standardize(aqu_ins$no..of.ind)
+aqu_ins$A <- aqu_ins$no..of.ind
+aqu_ins$W <- standardize(aqu_ins$pH)
+aqu_ins$Tem <- standardize(aqu_ins$water.temp..C.)
+aqu_ins$D <- standardize(aqu_ins$DO.mg..L.)
+# aqu_ins$M <- aqu_ins$with.without.macrophyte
+aqu_ins$M <- ifelse(aqu_ins$with.without.macrophyte == 1, 1, 2)
+
+aqu_ins$P <- as.factor(aqu_ins$Site); aqu_ins$P <- as.integer(aqu_ins$P)
+aqu_ins$Fam <- as.factor(aqu_ins$Family); aqu_ins$Fam <- as.integer(aqu_ins$Fam)
+aqu_ins$Vis <- as.factor(aqu_ins$Date); aqu_ins$Vis <- sort(as.integer(aqu_ins$Vis))
+
+aqu_ins$Date <- as.Date(aqu_ins$Date, "%m/%d/%Y")
+
+# aqu_ins$Vis <- as.integer(aqu_ins$Date)
+
+aqu_ins <- aqu_ins[complete.cases(aqu_ins), ] 
+str(aqu_ins)
+```
+
+#### Aquatic insects (all Families)
+```{r echo=FALSE}
+aqul <- list(
+  A = aqu_ins$no..of.ind,
+  Tem = aqu_ins$Tem, 
+  W = aqu_ins$W,
+  M = aqu_ins$M, 
+  D = aqu_ins$D, 
+  P = aqu_ins$P, 
+  Fam = aqu_ins$Fam,
+  Vis = aqu_ins$Vis-1
+)
+
+str(aqul)
+```
+
+#### Coenagrionidae
+```{r echo=FALSE}
+Coenagrionidae <- aqu_ins[aqu_ins$Family == 'Coenagrionidae', ]
+# str(Coenagrionidae)
+
+coen <- list(
+  A = Coenagrionidae$no..of.ind,
+  Tem = Coenagrionidae$Tem, 
+  W = Coenagrionidae$W,
+  M = Coenagrionidae$M, 
+  D = Coenagrionidae$D, 
+  P = Coenagrionidae$P, 
+  Fam = Coenagrionidae$Fam
+  # Vis = Coenagrionidae$Vis
+)
+
+str(coen)
+```
+
+#### Chironomidae
+```{r echo=FALSE}
+Chironomidae <- aqu_ins[aqu_ins$Family == 'Chironomidae', ]
+# str(Chironomidae)
+
+chir <- list(
+  A = Chironomidae$no..of.ind,
+  Tem = Chironomidae$Tem, 
+  W = Chironomidae$W,
+  M = Chironomidae$M, 
+  D = Chironomidae$D, 
+  P = Chironomidae$P, 
+  Fam = Chironomidae$Fam
+)
+str(chir)
+```
+
+### Prior simulation
+#### Gamma-Poisson GLM
+```{r message = FALSE, echo=FALSE}
+par(mar = c(1,1,1,1), mfrow = c(2, 2))
+# prior simulation for a (i.e., number of larvae)
+curve(dlnorm(x, 2, 0.5), from = 0, to = 20, n = 200, 
+      xlab = 'Mean number of larvae', ylab = 'Density')
+  mtext('a ~ dnorm(2, 0.5)')
+
+# prior simulation for b (i.e., relationship btw larval density and temperature)
+N <- 100
+a <- rnorm(N, 2, 0.5)
+b <- rnorm(N, 0, 0.2)
+plot(NULL, xlim = c(-2, 2), ylim = c(0, 100), 
+     xlab = 'Log temperaure', ylab = 'Counts of larvae')+
+  mtext('b~dnorm(0, 0.5)')
+  for (i in 1:N) curve(exp(a[i] + b[i]*x), add = TRUE, col = grau())
+
+# prior simulation for a and b
+x_seq <- seq(from = 0, to = log(50), length.out = 100)
+lambda <- sapply(x_seq, function(x) exp(a + b*x))
+
+plot(NULL, xlim = range(x_seq), ylim = c(0, 500), xlab = 'Log temperature (std)', ylab = 'Count of larvae')+
+  mtext('a ~ dnorm(2, 0.5), b~dnorm(0, 0.5)')+
+  for (i in 1:N) lines(x_seq, lambda[i, ], col = grau())
+
+plot(NULL, xlim = range(exp(x_seq)), ylim = c(0, 500), xlab = 'Temperature', ylab = 'Count of larvae')+
+  mtext('a ~ dnorm(2, 0.5), b~dnorm(0, 0.5)')+
+  for (i in 1:N) lines(exp(x_seq), lambda[i, ], col = grau())
+```
+
+#### Linear prediction
+```{r message = FALSE, echo=FALSE}
+N <- 100
+a <- rnorm(N, 2, 0.5)
+b <- rnorm(N, 0, 0.5)
+
+par(mfrow = c(1,1))
+plot(NULL, xlim = range(aqul$M), ylim = c(0, 4), 
+     xlab = 'Macrophytes', ylab = 'Temperature (std)')
+mtext('a ~ dnorm(2, 0.5), b ~ dnorm(0, 0.5)')
+xbar <- mean(aqul$M)
+for (i in 1:N) curve(a[i] + b[i]*(x - xbar), 
+                     from = min(aqul$M), to = max(aqul$M), add = TRUE, 
+                     col = col.alpha('black', 0.5))
+```
+
+### Family -> abundance
+```{r results='hide', message=FALSE}
+m_gpois_Fam <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[Fam], 
+    a[Fam] ~ dnorm(0, 0.5),
+    phi ~ dexp(1)
+  ), data = aqul, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+### Abundance of all aquatic insects: Macrophytes -> abundance
+#### Total
+```{r results='hide', message=FALSE}
+# Total effects of macrophytes on aquatic insect abundance list()
+set.seed(0000)
+m_t_mac_abuncance <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M], 
+    a[M] ~ dnorm(2, 0.5),
+    phi ~ dexp(1)
+  ), data = aqul, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_t_mac_abuncance_precis <- data.frame(precis(m_t_mac_abuncance, depth = 2, prob = 0.9))
+t1 <- kable(round(m_t_mac_abuncance_precis, 3), "pipe")
+```
+
+```{r}
+post <- extract.samples(m_t_mac_abuncance)
+
+# diff_m <- exp(post$a[, 2]) - exp(post$a[, 1])
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_1 <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+#### Direct
+
+```{r results='hide', message=FALSE}
+# "direct effects of macrophytes on abundance: c(\"D\", \"Tem\", \"W\")"
+set.seed(0000)
+m_d_mac_abuncance <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bT*Tem + bW*W + bD*D , 
+    a[M] ~ dnorm(2, 0.5),
+    c(bT, bW, bD) ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = aqul, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_mac_abuncance_precis <- data.frame(precis(m_d_mac_abuncance, 2, prob = 0.9))
+t2 <- kable(round(m_d_mac_abuncance_precis, 3), "pipe")
+```
+
+```{r}
+post <- extract.samples(m_d_mac_abuncance)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_2 <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+### Abundance of Coenagrinoidae: Macrophytes -> abundance
+#### Total
+
+```{r results='hide', message=FALSE}
+# Total effects of macrophytes on aquatic insect abundance list()
+set.seed(0000)
+m_t_mac_abuncance_coen <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M], 
+    a[M] ~ dnorm(2, 0.5),
+    phi ~ dexp(1)
+  ), data = coen, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_t_mac_abuncance_coen_precis <- data.frame(precis(m_t_mac_abuncance_coen, 2, prob = 0.9))
+t1_1 <- kable(round(m_t_mac_abuncance_coen_precis, 3), "pipe")
+```
+
+```{r}
+post <- extract.samples(m_t_mac_abuncance_coen)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_1_1 <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+#### Direct
+```{r results='hide', message=FALSE}
+# "direct effects of macrophytes on abundance: c(\"D\", \"Tem\", \"W\")"
+set.seed(0000)
+m_d_mac_abuncance_coen <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bT*Tem + bW*W + bD*D , 
+    a[M] ~ dnorm(2, 0.5),
+    c(bT, bW, bD) ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = coen, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_mac_abuncance_coen_precis <- data.frame(precis(m_d_mac_abuncance_coen, 2, prob = 0.9))
+t2_1 <- kable(round(m_d_mac_abuncance_coen_precis, 3), "pipe")
+```
+
+```{r}
+post <- extract.samples(m_d_mac_abuncance_coen)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_2_1 <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+### Abundance of Chironomidae: Macrophytes -> abundance
+```{r results='hide', message=FALSE}
+# Total effects of macrophytes on aquatic insect abundance list()
+set.seed(0000)
+m_t_mac_abuncance_chir <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M], 
+    a[M] ~ dnorm(2, 0.5),
+    phi ~ dexp(1)
+  ), data = coen, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_t_mac_abuncance_chir_precis <- data.frame(precis(m_t_mac_abuncance_chir, 2, prob = 0.9))
+t1_1 <- kable(round(m_t_mac_abuncance_chir_precis, 3), "pipe")
+```
+
+```{r}
+post <- extract.samples(m_t_mac_abuncance_chir)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_1_1 <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+#### Total
+```{r results='hide', message=FALSE}
+# Total effects of macrophytes on aquatic insect abundance list()
+set.seed(0000)
+m_t_mac_abuncance_chir <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M], 
+    a[M] ~ dnorm(2, 0.5),
+    phi ~ dexp(1)
+  ), data = chir, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_t_mac_abuncance_chir_precis <- data.frame(precis(m_t_mac_abuncance_chir, 2, prob = 0.9))
+t1_2 <- kable(round(m_t_mac_abuncance_chir_precis, 3), "pipe")
+```
+
+```{r}
+post <- extract.samples(m_t_mac_abuncance_chir)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_1_2 <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+#### Direct
+```{r results='hide', message=FALSE}
+# "direct effects of macrophytes on abundance: c(\"D\", \"Tem\", \"W\")"
+set.seed(0000)
+m_d_mac_abuncance_chir <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bT*Tem + bW*W + bD*D , 
+    a[M] ~ dnorm(2, 0.5),
+    c(bT, bW, bD) ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = chir, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_mac_abuncance_chir_precis <- data.frame(precis(m_d_mac_abuncance_chir, 2, prob = 0.9))
+t2_2 <- kable(round(m_d_mac_abuncance_chir_precis, 3), "pipe")
+```
+
+```{r}
+post <- extract.samples(m_d_mac_abuncance_chir)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_2_2 <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+### Macrophytes -> water quality factors (data: all aquatic insects, direct impacts)
+#### Water pH
+```{r results='hide', message=FALSE}
+# direct effects of macrophytes on water pH: list()
+set.seed(0000)
+m_d_mac_pH <- ulam(
+  alist(
+    W ~ dnorm(mu, sigma), 
+    mu <- a[M], 
+    a[M] ~ dnorm(2, 0.5),
+    sigma ~ dexp(1)
+  ), data = aqul, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+post <- extract.samples(m_d_mac_pH)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_3 <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+```{r results='hide', message=FALSE}
+# direct effects of macrophytes on water pH: list()
+set.seed(0000)
+m_d_mac_pH_coen <- ulam(
+  alist(
+    W ~ dnorm(mu, sigma), 
+    mu <- a[M], 
+    a[M] ~ dnorm(2, 0.5),
+    sigma ~ dexp(1)
+  ), data = coen, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+post <- extract.samples(m_d_mac_pH_coen)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_3_coen <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+```{r results='hide', message=FALSE}
+# direct effects of macrophytes on water pH: list()
+set.seed(0000)
+m_d_mac_pH_chir <- ulam(
+  alist(
+    W ~ dnorm(mu, sigma), 
+    mu <- a[M], 
+    a[M] ~ dnorm(2, 0.5),
+    sigma ~ dexp(1)
+  ), data = chir, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+post <- extract.samples(m_d_mac_pH_chir)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_3_chir <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+#### Water temperature
+```{r results='hide', message=FALSE}
+# direct effects of macrophytes on water temperature: list()
+set.seed(0000)
+m_d_mac_tem <- ulam(
+  alist(
+    Tem ~ dnorm(mu, sigma), 
+    mu <- a[M], 
+    a[M] ~ dnorm(2, 0.5),
+    sigma ~ dexp(1)
+  ), data = aqul, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+post <- extract.samples(m_d_mac_tem)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_4 <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+```{r results='hide', message=FALSE}
+# direct effects of macrophytes on water temperature: list()
+set.seed(0000)
+m_d_mac_tem_coen <- ulam(
+  alist(
+    Tem ~ dnorm(mu, sigma), 
+    mu <- a[M], 
+    a[M] ~ dnorm(2, 0.5),
+    sigma ~ dexp(1)
+  ), data = coen, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+post <- extract.samples(m_d_mac_tem_coen)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_4_coen <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+```{r results='hide', message=FALSE}
+# direct effects of macrophytes on water temperature: list()
+set.seed(0000)
+m_d_mac_tem_chir <- ulam(
+  alist(
+    Tem ~ dnorm(mu, sigma), 
+    mu <- a[M], 
+    a[M] ~ dnorm(2, 0.5),
+    sigma ~ dexp(1)
+  ), data = chir, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+post <- extract.samples(m_d_mac_tem_chir)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_4_chir <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+#### Dissolved oxygen
+```{r results='hide', message=FALSE}
+# direct effects of macrophytes on dissolved oxygen: Tem
+set.seed(0000)
+m_d_mac_DO <- ulam(
+  alist(
+    D ~ dnorm(mu, sigma), 
+    mu <- a[M] + bT*Tem, 
+    a[M] ~ dnorm(2, 0.5),
+    bT ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ), data = aqul, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+post <- extract.samples(m_d_mac_DO)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_5 <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+```{r results='hide', message=FALSE}
+# direct effects of macrophytes on dissolved oxygen: Tem
+set.seed(0000)
+m_d_mac_DO_coen <- ulam(
+  alist(
+    D ~ dnorm(mu, sigma), 
+    mu <- a[M] + bT*Tem, 
+    a[M] ~ dnorm(2, 0.5),
+    bT ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ), data = coen, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+post <- extract.samples(m_d_mac_DO_coen)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_5_coen <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+```{r results='hide', message=FALSE}
+# direct effects of macrophytes on dissolved oxygen: Tem
+set.seed(0000)
+m_d_mac_DO_chir <- ulam(
+  alist(
+    D ~ dnorm(mu, sigma), 
+    mu <- a[M] + bT*Tem, 
+    a[M] ~ dnorm(2, 0.5),
+    bT ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ), data = chir, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+post <- extract.samples(m_d_mac_DO_chir)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+diff_m_5_chir <- precis(diff_m, hist = FALSE, prob = 0.9)
+```
+
+### Water qualify factors -> abundance
+#### Water pH
+##### All aquatic insects
+```{r results='hide', message=FALSE}
+# direct effects of water pH on abundance: M
+set.seed(0000)
+m_d_pH_abuncance <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bW*W, 
+    a[M] ~ dnorm(2, 0.5),
+    bW ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = aqul, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_pH_abuncance_precis <- data.frame(precis(m_d_pH_abuncance, 2, prob = 0.9))
+t3 <- kable(round(m_d_pH_abuncance_precis, 3), "pipe")
+```
+
+##### Coenagrionidae
+```{r results='hide', message=FALSE}
+# direct effects of water pH on abundance: M
+set.seed(0000)
+m_d_pH_abuncance_coen <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bW*W, 
+    a[M] ~ dnorm(2, 0.5),
+    bW ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = coen, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_pH_abuncance_coen_precis <- data.frame(precis(m_d_pH_abuncance_coen, 2, prob = 0.9))
+t3_1 <- kable(round(m_d_pH_abuncance_coen_precis, 3), "pipe")
+```
+
+##### Chironomidae
+```{r results='hide', message=FALSE}
+# direct effects of water pH on abundance: M
+set.seed(0000)
+m_d_pH_abuncance_chir <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bW*W, 
+    a[M] ~ dnorm(2, 0.5),
+    bW ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = chir, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_pH_abuncance_chir_precis <- data.frame(precis(m_d_pH_abuncance_chir, 2, prob = 0.9))
+t3_2 <- kable(round(m_d_pH_abuncance_chir_precis, 3), "pipe")
+```
+
+#### Water temperature
+##### All aquatic insects
+```{r results='hide', message=FALSE}
+# direct effects of water temperature on abundance: c(\"D\", \"M\")
+set.seed(0000)
+m_d_tem_abundance <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bT*Tem + bD*D, 
+    a[M] ~ dnorm(2, 0.5),
+    c(bT, bD) ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = aqul, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+m_d_tem_abundance_precis <- data.frame(precis(m_d_tem_abundance, 2, prob = 0.9))
+t4 <- kable(round(m_d_tem_abundance_precis, 3), "pipe")
+```
+
+##### Coenagrionidae
+```{r results='hide', message=FALSE}
+# direct effects of water temperature on abundance: c(\"D\", \"M\")
+set.seed(0000)
+m_d_tem_abundance_coen <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bT*Tem + bD*D, 
+    a[M] ~ dnorm(2, 0.5),
+    c(bT, bD) ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = coen, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+m_d_tem_abundance_coen_precis <- data.frame(precis(m_d_tem_abundance_coen, 2, prob = 0.9))
+t4_1 <- kable(round(m_d_tem_abundance_coen_precis, 3), "pipe")
+```
+
+##### Chironomidae
+```{r results='hide', message=FALSE}
+# direct effects of water temperature on abundance: c(\"D\", \"M\")
+set.seed(0000)
+m_d_tem_abundance_chir <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bT*Tem + bD*D, 
+    a[M] ~ dnorm(2, 0.5),
+    c(bT, bD) ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = chir, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+m_d_tem_abundance_chir_precis <- data.frame(precis(m_d_tem_abundance_chir, 2, prob = 0.9))
+t4_2 <- kable(round(m_d_tem_abundance_chir_precis, 3), "pipe")
+```
+
+#### Dissolved oxygen
+##### All aquatic insects
+```{r results='hide', message=FALSE}
+# direct effects of dissolved oxygen on abundance: Tem
+set.seed(0000)
+m_d_do_abuncance <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bT*Tem + bD*D,
+    a[M] ~ dnorm(2, 0.5),
+    c(bT, bD) ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = aqul, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_do_abuncance_precis <- data.frame(precis(m_d_do_abuncance, 2, prob = 0.9))
+t5 <- kable(round(m_d_do_abuncance_precis, 3), "pipe")
+```
+
+##### Coenagrionidae
+```{r results='hide', message=FALSE}
+# direct effects of dissolved oxygen on abundance: Tem
+set.seed(0000)
+m_d_do_abuncance_coen <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bT*Tem + bD*D,
+    a[M] ~ dnorm(2, 0.5),
+    c(bT, bD) ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = coen, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_do_abuncance_coen_precis <- data.frame(precis(m_d_do_abuncance_coen, 2, prob = 0.9))
+t5_1 <- kable(round(m_d_do_abuncance_coen_precis, 3), "pipe")
+```
+
+##### Chironomidae
+```{r results='hide', message=FALSE}
+# direct effects of dissolved oxygen on abundance: Tem
+set.seed(0000)
+m_d_do_abuncance_chir <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + bT*Tem + bD*D,
+    a[M] ~ dnorm(2, 0.5),
+    c(bT, bD) ~ dnorm(0, 0.2),
+    phi ~ dexp(1)
+  ), data = chir, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_do_abuncance_chir_precis <- data.frame(precis(m_d_do_abuncance_chir, 2, prob = 0.9))
+t5_2 <- kable(round(m_d_do_abuncance_chir_precis, 3), "pipe")
+```
+
+### Effects among water qualify factors
+
+Water temperature -> water pH
+
+```{r results='hide', message=FALSE}
+# direct effects of water temperature on water pH: M
+
+# m_d_tem_pH <- ulam(
+#   alist(
+#     W ~ dnorm(mu, sigma), 
+#     mu <- a[M] + bT*Tem, 
+#     a[M] ~ dnorm(2, 0.5),
+#     bT ~ dnorm(0, 0.5),
+#     sigma ~ dexp(1)
+#   ), data = aqul, cores = 4, chains = 4, log_lik = TRUE
+# )
+```
+
+```{r echo=FALSE}
+# m_d_tem_pH_precis <- data.frame(precis(m_d_tem_pH, 2))
+# t6 <- kable(round(m_d_tem_pH_precis, 3), "pipe")
+```
+
+#### Water temperaure -> dissolved oxygen (data: all aquatic insects, total impacts)
+```{r results='hide', message=FALSE}
+#  effects of water temperature on dissolved oxygen: M
+# Aquatic insects
+set.seed(0000)
+m_d_tem_do <- ulam(
+  alist(
+    D ~ dnorm(mu, sigma), 
+    mu <- a[M] + bT*Tem, 
+    a[M] ~ dnorm(2, 0.5), 
+    bT ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ), data = aqul, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_tem_do_precis <- data.frame(precis(m_d_tem_do, 2, prob = 0.9))
+t7 <- kable(round(m_d_tem_do_precis, 3), "pipe")
+```
+
+```{r results='hide', message=FALSE}
+#  effects of water temperature on dissolved oxygen: M
+# Damselfly larvae
+set.seed(0000)
+m_d_tem_do_coen <- ulam(
+  alist(
+    D ~ dnorm(mu, sigma), 
+    mu <- a[M] + bT*Tem, 
+    a[M] ~ dnorm(2, 0.5), 
+    bT ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ), data = coen, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_tem_do_coen_precis <- data.frame(precis(m_d_tem_do_coen, 2, prob = 0.9))
+t8 <- kable(round(m_d_tem_do_coen_precis, 3), "pipe")
+```
+
+```{r results='hide', message=FALSE}
+#  effects of water temperature on dissolved oxygen: M
+# Midge larvae
+set.seed(0000)
+m_d_tem_do_chir <- ulam(
+  alist(
+    D ~ dnorm(mu, sigma), 
+    mu <- a[M] + bT*Tem, 
+    a[M] ~ dnorm(2, 0.5), 
+    bT ~ dnorm(0, 0.5),
+    sigma ~ dexp(1)
+  ), data = chir, cores = 4, chains = 4, log_lik = TRUE
+)
+```
+
+```{r echo=FALSE}
+m_d_tem_do_chir_precis <- data.frame(precis(m_d_tem_do_chir, 2, prob = 0.9))
+t9 <- kable(round(m_d_tem_do_chir_precis, 3), "pipe")
+```
+
+### Macrophytes -> interactions between water quality and abundance
+#### Water temperature (Chironomidae)
+```{r results='hide', message=FALSE}
+set.seed(0000)
+m_interact_tem_Chi <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + b[M]*Tem , 
+    a[M] ~ dnorm(2, 0.5), 
+    b[M] ~ dnorm(0, 0.2), 
+    phi ~ dexp(1)
+  ), data = chir, chains = 4, log_lik = TRUE, cmdstan = TRUE
+)
+```
+
+```{r echo=FALSE}
+# precis(m_interact_tem_Chi, 2)
+
+post <- extract.samples(m_interact_tem_Chi)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+a_m <- precis(diff_m, hist = FALSE, prob = 0.9)
+a_m <- a_m@.Data
+
+diff_m <- post$b[, 2] - post$b[, 1]
+b_m <- precis(diff_m, hist = FALSE, prob = 0.9)
+mean(exp(post$b))
+b_m <- b_m@.Data
+
+mean <- c(a_m[[1]], b_m[[1]])
+sd <- c(a_m[[2]], b_m[[2]])
+`5%` <- c(a_m[[3]], b_m[[3]])
+`95%` <- c(a_m[[4]], b_m[[4]])
+
+df <- data.frame(mean, sd, `5%`, `95%`)
+df$variable <- c('a_differences', 'b_differences')
+df <- df[, c(5, 1, 2, 3, 4)]
+
+t8 = kable(df, digits = 3)
+```
+
+`r t8`
+
+#### Water temperature (Coenagrionidae)
+```{r echo = FALSE, results='hide', message=FALSE}
+set.seed(0000)
+m_interact_tem_Coe <- ulam(
+  alist(
+    A ~ dgampois(lambda, phi), 
+    log(lambda) <- a[M] + b[M]*Tem , 
+    a[M] ~ dnorm(2, 0.5), 
+    b[M] ~ dnorm(0, 0.2), 
+    phi ~ dexp(1)
+  ), data = coen, chains = 4, log_lik = TRUE,  cmdstan = TRUE
+)
+```
+
+```{r echo=FALSE}
+post <- extract.samples(m_interact_tem_Coe)
+
+diff_m <- post$a[, 2] - post$a[, 1]
+a_m <- precis(diff_m, hist = FALSE, prob = 0.9)
+a_m <- a_m@.Data
+
+diff_m <- post$b[, 2] - post$b[, 1]
+b_m <- precis(diff_m, hist = FALSE, prob = 0.9)
+mean(exp(post$b))
+b_m <- b_m@.Data
+
+mean <- c(a_m[[1]], b_m[[1]])
+sd <- c(a_m[[2]], b_m[[2]])
+`5%` <- c(a_m[[3]], b_m[[3]])
+`95%` <- c(a_m[[4]], b_m[[4]])
+
+df <- data.frame(mean, sd, `5%`, `95%`)
+df$variable <- c('a_differences', 'b_differences')
+df <- df[, c(5, 1, 2, 3, 4)]
+t9 = kable(df, digits = 3)
+```
+
+`r t9`
+
+### Effects of time (variation across time)
+```{r results='hide'}
+# Dummy variable approach (assign with Macrophyts = 1, without Macrophytes = 0)
+# aqul$M <- ifelse(aqu_ins$with.without.macrophyte == 1, 0, 1)
+aqul$M <- aqu_ins$with.without.macrophyte
+aqul$Vis <- aqu_ins$Vis-1
+str(aqul)
+```
+
+```{r results='hide', message=FALSE}
+set.seed(0000)
+m_Visit <- ulam(
+  alist(
+    A ~ dpois(lambda), 
+    log(lambda) <- a + b[Vis]*M, 
+    a ~ dnorm(0, 1.5),
+    b[Vis] ~ dnorm(2, 0.5)
+  ), data = aqul, chains = 4, log_lik = TRUE
+)
+```
+
+```{r results='hide'}
+# post <- extract.samples(m_Visit)
+# 
+# diff_m <- post$a[, 2] - post$a[, 1]
+# diff_m_6 <- precis(diff_m, hist = FALSE)
+# 
+# diff_m  <- post$b[, 2] - post$b[, 1]
+# diff_m_7 <- precis(diff_m, hist = FALSE)
+```
+
+```{r echo=FALSE}
+m_Visit_precis <- data.frame(precis(m_Visit, 2, prob = 0.9))
+t10 <- kable(round(m_Visit_precis, 3), "pipe")
+```
+
+```{r results='hide', message=FALSE}
+# m_VarySlopes <- ulam(
+#   alist(
+#     A ~ dpois(lambda), 
+#     log(lambda) <- a[Vis] + b[Vis]*M,  
+#     c(a, b)[Vis] ~ multi_normal(c(a_bar, b_bar), Rho, sigma_visit), 
+#     a_bar ~ normal(2, 0.5), 
+#     b_bar ~ normal(-1, 0.5), 
+#     sigma_visit ~ exponential(1), 
+#     Rho ~ lkj_corr(2)
+#   ), data = aqul, chains = 4, cores = 4, log_lik = TRUE
+# )
+```
+
+```{r}
+# m_VarySlopes_precis <- data.frame(precis(m_VarySlopes, 2))
+# t11 <- kable(round(m_VarySlopes_precis, 3), "pipe")
+```
+
+### Effecits of family
+```{r results='hide', message=FALSE}
+set.seed(0000)
+m_family <- ulam(
+  alist(
+    A ~ dpois(lambda), 
+    log(lambda) <- a + b[Fam]*M, 
+    a ~ dnorm(0, 1.5),
+    b[Fam] ~ dnorm(2, 0.5)
+  ), data = aqul, chains = 4, log_lik = TRUE
+)
+```
+
+```{r}
+m_family_precis <- data.frame(precis(m_family, 2, prob = 0.9))
+t11 <- kable(round(m_family_precis, 3), "pipe")
+```
+
+# Results (Part 1)
+
+## 1)What are the impacts of vegetation cutting on the abundance of aquatic insects?
+
+-   **Total** effects of **macrophytes mowing** on **aquatic insect abundance**: mean = `r round(diff_m_1['mean'], 3)`, [`r round(diff_m_1['5%'], 3)`, `r round(diff_m_1['95%'], 3)`].
+
+-   **Total** effects of **macrophytes mowing** on **Coenagrionidae larval abundance**: mean = `r round(diff_m_1_1['mean'], 3)`, [`r round(diff_m_1_1['5%'], 3)`, `r round(diff_m_1_1['95%'], 3)`].
+
+-   **Total** effects of **macrophytes mowing** on **Chironomidae larval abundance**: mean = `r round(diff_m_1_2['mean'], 3)`, [`r round(diff_m_1_2['5%'], 3)`, `r round(diff_m_1_2['95%'], 3)`].
+
+```{r results='hide', echo=FALSE}
+Outcome <- c('Aquatic insects', 'Coenagrionidae larvae', 'Chironomidae larvae')
+Predictor <- c(rep('Presence of Macrophytes', 3))
+mean <- c(-0.356, 0.321, -0.266)
+CI <- c('-0.695 to -0.015', '-0.401 to 1.028', '-0.682 to 0.173')
+
+total_mac <- data.frame(Outcome, Predictor, mean, CI)
+colnames(total_mac) <- c('Outcome variable (log scale)', 'Predictor', 'Posterior mean', '89% CI')
+
+kable(total_mac, 'latex')
+```
+
+```{r}
+families <- c('Total', 'Damselfly', 'Midge')
+mean <- as.numeric(c(diff_m_1['mean'], diff_m_1_1['mean'], diff_m_1_2['mean']))
+`5%` <- as.numeric(c(diff_m_1['5%'], diff_m_1_1['5%'], diff_m_1_2['5%']))
+`95%` <- as.numeric(c(diff_m_1['95%'], diff_m_1_1['95%'], diff_m_1_2['95%']))
+total_mowing <- data.frame(families, mean, `5%`, `95%`)
+```
+
+```{r}
+labels <- c('Total', 'Coenagrionidae', 'Chironomidae')
+n <- 3
+
+# png(file="C:/Users/judy8/Box/PhD_UCD/UCD_course/Fall_2022/ECL298_Bayesian_models/Publication_Fresh_bio/Figures_tables/variation_across_families.png", width = 7, height = 5, units = "in", res = 300)
+par(mfrow = c(1,1), mar = c(6.5, 6, 1, 4))
+plot(x=1:n, y=total_mowing$mean, xaxt = 'n', 
+     xlab = '', ylab = 'Coefficient values of mowing \n on abundance', 
+     xlim = c(1, n+0.1), ylim = c(-1, 1), col = 'darkgreen', cex = 2,
+     pch = 16, bty = 'l')+
+  abline(h = 0, col = 'grey')+
+  axis(1, at = c(1:n), labels = labels, las = 2, cex = 2, cex.axis = 0.8, col.axis = 'white')
+  for (i in 1:n){
+    lines(x = c(rep(i, n), rep(i, n)),
+          y = c(rep(total_mowing$X95.[i], n), rep(total_mowing$X5.[i], n)), lwd = 3, col = 'darkgreen')
+    # abline(v = i, lty = 2, col = col.alpha('grey', 0.3))
+  } +
+  text(x = (1:n)+0.1, y = (total_mowing$mean)+0.01, labels=round(total_mowing$mean, 2), cex= 0.7)
+# dev.off()
+```
+
+## 2)How does vegetation cutting influence aquatic insect communities? Is it a direct impact or though affecting local water quality factors (i.e., water temperature, water pH, and dissolved oxygen)?
+
+```{r echo=FALSE, results='hide'}
+# png(file="C:/Users/judy8/Box/PhD_UCD/UCD_course/Fall_2022/ECL298_Bayesian_models/Results/family_abundance.png",
+#     width = 10, height = 5, units = "in", res = 300)
+# Fam <- precis(m_gpois_Fam, 2, pars = 'a')
+# labels <- paste('a[', 1:8, ']: ', sort(unique(aqu_ins$Family)), sep = '')
+# 
+# par(mfrow = c(1,1), mar=c(5,10,3,10))
+# plot(x = Fam$mean, y = 1:8, pch = 16, yaxt = 'n', xlab = 'Expected density (std)', ylab = '', xlim = c(-1, 2.5))+
+#   axis(2, at = c(1:8), labels = labels,  las = 2, cex = 0.5, cex.axis=0.8)
+#   for (i in 1:8){
+#     lines(y = c(rep(i, 8), rep(i, 8)),
+#           x = c(rep(Fam$`94.5%`[i], 8), rep(Fam$`5.5%`[i], 8)), lwd = 2)
+#     abline(h = i, lty = 2, col = col.alpha('grey', 0.3))
+#   }
+# dev.off()
+```
+
+```{r warning=FALSE, message=FALSE}
+aqu_ins$month <- as.integer(format(aqu_ins$Date, '%m'))
+Fam_sum <- aggregate(no..of.ind ~ month + Family, aqu_ins, function(x) sum(x))
+
+Fam_sum <- pivot_wider(Fam_sum, names_from = Family, values_from = no..of.ind)
+Fam_sum[is.na(Fam_sum)] = 0
+Fam_sum <- Fam_sum[order(Fam_sum$month),]
+
+Fam_data <- as.matrix(Fam_sum[, 2:9])
+# rownames(Fam_data) <- 4:9
+```
+
+```{r}
+# png(file="C:/Users/judy8/Box/PhD_UCD/UCD_course/Fall_2022/ECL298_Bayesian_models/Publication_Fresh_bio/Figures_tables/monthly_family_composition.png",
+#     width = 6, height = 4, units = "in", res = 300)
+par(mar = c(2, 4, 2, 2))
+color <- c('#1b9e77','#d95f02','#7570b3','#e7298a','#66a61e','#e6ab02','#a6761d','#666666')
+
+barplot(t(Fam_data), 
+        border="black", 
+        font.axis=1, 
+        col = color,
+        xlab="",
+        ylab = 'Number of larval counts',
+        names.arg = month.abb[4:9], 
+        font.lab=2, 
+        ylim = c(0, 300), 
+        space = 0.7)
+legend('topright', legend=colnames(Fam_data), 
+       fill = color, cex = 0.8, ncol = 2)
+# dev.off()
+```
+
+```{r echo=FALSE}
+new_order <- with(aqu_ins, reorder(Site , no..of.ind, FUN = 'mean', na.rm=T))
+# new_order <- factor(new_order, levels = c('pond 2', 'pond 3', 'pond 4'))
+color <- c("#d8b365" , "#5ab4ac")
+
+
+# png(file="C:/Users/judy8/Box/PhD_UCD/UCD_course/Fall_2022/ECL298_Bayesian_models/Publication_Fresh_bio/Figures_tables/water_quality_compare.png", width = 10, height = 5, units = "in", res = 300)
+par(mar=c(3,5,3,3), mfrow = c(1, 3))
+
+do_plot <- boxplot(DO.mg..L. ~ with.without.macrophyte*new_order, data = aqu_ins, 
+                     xlab = '', ylab = 'Dissolved oxygen (mg/ L)',
+                     col=color,
+                     xaxt = 'n', boxwex = 0.5)
+axis(1, at = seq(1.5 , 6 , 2),
+     labels = my_names,
+     tick=FALSE , cex=0.5)
+# Add the grey vertical lines
+for(i in seq(0.5 , 10 , 2)){abline(v=i,lty=1, col="grey")}
+# Add a legend
+legend("topleft", legend = c("With mowing macrophytes", "Without mowing macrophytes"), 
+       col=color,
+       pch = 15, bty = "n", 
+       pt.cex = 1.5, cex = 1.2,  horiz = F, inset = c(0.05, 0.05))
+mtext('(A)', side = 3, adj = 1, line = 1)
+
+pH_plot <- boxplot(pH ~ with.without.macrophyte*new_order, data = aqu_ins, 
+                     xlab = '', ylab = 'Water pH',
+                     col=color,
+                     xaxt = 'n', boxwex = 0.5)
+axis(1, at = seq(1.5 , 6 , 2),
+     labels = my_names ,
+     tick=FALSE , cex=0.5)
+# Add the grey vertical lines
+for(i in seq(0.5 , 10 , 2)){abline(v=i,lty=1, col="grey")}
+mtext('(B)', side = 3, adj = 1, line = 1)
+
+
+temp_plot <- boxplot(water.temp..C. ~ with.without.macrophyte*new_order, data = aqu_ins, 
+                     xlab = 'Site', ylab = 'Water temperature (°C)',
+                     col=color,
+                     xaxt="n", boxwex = 0.5)
+my_names <- sapply(strsplit(temp_plot$names , '\\.') , function(x) x[[2]] )
+my_names <- my_names[seq(1 , length(my_names) , 2)]
+axis(1, at = seq(1.5 , 6 , 2), 
+     labels = my_names , 
+     tick=FALSE , cex=0.5)
+# Add the grey vertical lines
+for(i in seq(0.5 , 10 , 2)){abline(v=i,lty=1, col="grey")}
+mtext('(C)', side = 3, adj = 1, line = 1)
+# dev.off()
+```
+
+```{r}
+png(file="C:/Users/judy8/Box/PhD_UCD/UCD_course/Fall_2022/ECL298_Bayesian_models/Publication/Figures_tables/water_quality_over_time.png", width = 15, height = 15, units = "in", res = 300)
+
+# Set colors and plot space
+color <- c("#d8b365" , "#5ab4ac") #mowing, without mowing
+# Generate monthly grid positions
+par(mar=c(3,5,3,3), mfrow = c(3, 1))
+
+# Water temperature----------------------------------------------------------------------------------------
+mean_temp <- aggregate(water.temp..C. ~ with.without.macrophyte + Date, data = aqu_ins, FUN = 'mean')
+temp_mowing <- mean_temp[mean_temp$with.without.macrophyte == 0, ]
+temp_no_mowing <- mean_temp[mean_temp$with.without.macrophyte == 1, ]
+
+# Plot the data
+plot(temp_mowing$Date, temp_mowing$water.temp..C, 
+     ylim = c(22, 35),
+     type = "o", pch = 15, col = color[1], 
+     xlab = "", ylab = "Water temperature (°C)", 
+     main = "Water Temperature", 
+     cex = 2, cex.axis = 2, cex.lab = 2, cex.main = 3, lwd = 3)
+lines(temp_no_mowing$Date, temp_no_mowing$water.temp..C, 
+      type = "o", col = color[2], pch = 15, cex = 2, lwd = 3)
+grid(nx = 22, ny = 7, col = "gray", lty = 1) # Add gridlines
+legend("topright", legend = c("With mowing", "Without mowing"),
+       col=color,
+       pch = 15, bty = "n",
+       pt.cex = 2.5, cex = 2.5,  horiz = F, inset = c(0.05, 0.05))
+mtext('(A)', side = 3, adj = 1, line = 1, cex = 1.5)
+
+# Water pH----------------------------------------------------------------------------------------
+mean_pH <- aggregate(pH ~ with.without.macrophyte + Date, data = aqu_ins, FUN = 'mean')
+pH_mowing <- mean_pH[mean_temp$with.without.macrophyte == 0, ]
+pH_no_mowing <- mean_pH[mean_temp$with.without.macrophyte == 1, ]
+
+# Plot the data
+plot(pH_mowing$Date, pH_mowing$pH, 
+     ylim = c(6.5, 9),
+     type = "o", pch = 15, col = color[1], 
+     xlab = "", ylab = "Water pH", 
+     main = "Water pH", 
+     cex = 2, cex.axis = 2, cex.lab = 2, cex.main = 3, lwd = 3)
+lines(pH_no_mowing$Date, pH_no_mowing$pH, 
+      type = "o", col = color[2], pch = 15, cex = 2, lwd = 3)
+grid(nx = 22, ny = 7, col = "gray", lty = 1) # Add gridlines
+legend("topright", legend = c("With mowing", "Without mowing"),
+       col=color,
+       pch = 15, bty = "n",
+       pt.cex = 2.5, cex = 2.5,  horiz = F, inset = c(0.05, 0.05))
+mtext('(B)', side = 3, adj = 1, line = 1, cex = 1.5)
+
+# DO----------------------------------------------------------------------------------------
+mean_DO <- aggregate(DO.mg..L. ~ with.without.macrophyte + Date, data = aqu_ins, FUN = 'mean')
+DO_mowing <- mean_DO[mean_DO$with.without.macrophyte == 0, ]
+DO_no_mowing <- mean_DO[mean_DO$with.without.macrophyte == 1, ]
+
+# Plot the data
+plot(DO_mowing$Date, DO_mowing$DO.mg..L., 
+     ylim = c(0, 15),
+     type = "o", pch = 15, col = color[1], 
+     xlab = "", ylab = "DO (mg/L)", 
+     main = "Dissolved oxygen", 
+     cex = 2, cex.axis = 2, cex.lab = 2, cex.main = 3, lwd = 3)
+lines(DO_mowing$Date, DO_no_mowing$DO.mg..L., 
+      type = "o", col = color[2], pch = 15, cex = 2, lwd = 3)
+grid(nx = 22, ny = 7, col = "gray", lty = 1) # Add gridlines
+legend("topright", legend = c("With mowing", "Without mowing"),
+       col=color,
+       pch = 15, bty = "n",
+       pt.cex = 2.5, cex = 2.5,  horiz = F, inset = c(0.05, 0.05))
+
+mtext('(C)', side = 3, adj = 1, line = 1, cex = 1.5)
+
+dev.off()
+```
+
+
+### Aquatic insects (log scale)
+-   **Direct** effects of **macrophytes mowing** on **abundance** : mean = `r round(diff_m_2['mean'], 3)`, [`r round(diff_m_2['5%'], 3)`, `r round(diff_m_2['95%'], 3)`].
+
+-   **Direct** effects of **macrophytes mowing** on **water pH**: mean = `r round(diff_m_3['mean'], 3)`, [`r round(diff_m_3['5%'], 3)`, `r round(diff_m_3['95%'], 3)`].
+
+-   **Direct** effects of **macrophytes mowing** on **water temperature**: mean = `r round(diff_m_4['mean'], 3)`, [`r round(diff_m_4['5%'], 3)`, `r round(diff_m_4['95%'], 3)`].
+
+-   **Direct** effects of **macrophytes mowing** on **dissolved oxygen**: mean = `r round(diff_m_5['mean'], 3)`, [`r round(diff_m_5['5%'], 3)`, `r round(diff_m_5['95%'], 3)`].
+
+-   **Direct** effects of **water pH** on **abundance**: mean = `r round(m_d_pH_abuncance_precis['bW', 'mean'], 3)`, [`r round(m_d_pH_abuncance_precis['bW', 'X5.'], 3)`, `r round(m_d_pH_abuncance_precis['bW', 'X95.'], 3)`].
+
+-   **Direct** effects of **water temperature** on **abundance**: mean = `r round(m_d_tem_abundance_precis['bT', 'mean'], 3)`, [`r round(m_d_tem_abundance_precis['bT', 'X5.'], 3)`, `r round(m_d_tem_abundance_precis['bT', 'X95.'], 3)`].
+
+-   **Direct** effects of **dissolved oxygen** on **abundance**: mean = `r round(m_d_do_abuncance_precis['bD', 'mean'], 3)`, [`r round(m_d_do_abuncance_precis['bD', 'X5.'], 3)`, `r round(m_d_do_abuncance_precis['bD', 'X95.'], 3)`].
+
+-   **Total** effects of **water temperature** on **dissolved oxygen**: mean = `r round(m_d_tem_do_precis['bT', 'mean'], 3)`, [`r round(m_d_tem_do_precis['bT', 'X5.'], 3)`, `r round(m_d_tem_do_precis['bT', 'X95.'], 3)`]. (Unknown factor: phytoplankton)
+
+
+### Coenagrionidae (log scale)
+
+-   **Direct** effects of **macrophytes mowing** on **Coenagrionidae abundance**: mean = `r round(diff_m_2_1['mean'], 3)`, [`r round(diff_m_2_1['5%'], 3)`, `r round(diff_m_2_1['95%'], 3)`].
+
+-   **Direct** effects of **macrophytes mowing** on **water pH**: mean = `r round(diff_m_3_coen['mean'], 3)`, [`r round(diff_m_3_coen['5%'], 3)`, `r round(diff_m_3_coen['95%'], 3)`].
+
+-   **Direct** effects of **macrophytes mowing** on **water temperature**: mean = `r round(diff_m_4_coen['mean'], 3)`, [`r round(
+['5%'], 3)`, `r round(diff_m_4_coen['95%'], 3)`].
+
+-   **Direct** effects of **macrophytes mowing** on **dissolved oxygen**: mean = `r round(diff_m_5_coen['mean'], 3)`, [`r round(diff_m_5_coen['5%'], 3)`, `r round(diff_m_5_coen['95%'], 3)`].
+
+-   **Direct** effects of **water pH** on **abundance**: mean = `r round(m_d_pH_abuncance_coen_precis['bW', 'mean'], 3)`, [`r round(m_d_pH_abuncance_coen_precis['bW', 'X5.'], 3)`, `r round(m_d_pH_abuncance_coen_precis['bW', 'X95.'], 3)`].
+
+-   **Direct** effects of **water temperature** on **Coenagrionidae abundance**: mean = `r round(m_d_tem_abundance_coen_precis['bT', 'mean'], 3)`, [`r round(m_d_tem_abundance_coen_precis['bT', 'X5.'], 3)`, `r round(m_d_tem_abundance_coen_precis['bT', 'X95.'], 3)`].
+
+-   **Direct** effects of **dissolved oxygen** on **Coenagrionidae abundance**: mean = `r round(m_d_do_abuncance_coen_precis['bD', 'mean'], 3)`, [`r round(m_d_do_abuncance_coen_precis['bD', 'X5.'], 3)`, `r round(m_d_do_abuncance_coen_precis['bD', 'X95.'], 3)`].
+
+
+### Chironomidae (log scale)
+
+-   **Direct** effects of **macrophytes mowing** on **Chironomidae abundance**: mean = `r round(diff_m_2_2['mean'], 3)`, [`r round(diff_m_2_2['5%'], 3)`, `r round(diff_m_2_2['95%'], 3)`].
+
+-   **Direct** effects of **macrophytes mowing** on **water pH**: mean = `r round(diff_m_3_chir['mean'], 3)`, [`r round(diff_m_3_chir['5%'], 3)`, `r round(diff_m_3_chir['95%'], 3)`].
+
+-   **Direct** effects of **macrophytes mowing** on **water temperature**: mean = `r round(diff_m_4_chir['mean'], 3)`, [`r round(diff_m_4_chir['5%'], 3)`, `r round(diff_m_4_chir['95%'], 3)`].
+
+-   **Direct** effects of **macrophytes mowing** on **dissolved oxygen**: mean = `r round(diff_m_5_chir['mean'], 3)`, [`r round(diff_m_5_chir['5%'], 3)`, `r round(diff_m_5_chir['95%'], 3)`].
+
+-   **Direct** effects of **water pH** on **abundance**: mean = `r round(m_d_pH_abuncance_chir_precis['bW', 'mean'], 3)`, [`r round(m_d_pH_abuncance_chir_precis['bW', 'X5.'], 3)`, `r round(m_d_pH_abuncance_chir_precis['bW', 'X95.'], 3)`].
+
+-   **Direct** effects of **water temperature** on **Chironomidae abundance**: mean = `r round(m_d_tem_abundance_chir_precis['bT', 'mean'], 3)`, [`r round(m_d_tem_abundance_chir_precis['bT', 'X5.'], 3)`, `r round(m_d_tem_abundance_chir_precis['bT', 'X95.'], 3)`].
+
+-   **Direct** effects of **dissolved oxygen** on **Chironomidae abundance**: mean = `r round(m_d_do_abuncance_chir_precis['bD', 'mean'], 3)`, [`r round(m_d_do_abuncance_chir_precis['bD', 'X5.'], 3)`, `r round(m_d_do_abuncance_chir_precis['bD', 'X95.'], 3)`].
+
+```{r}
+# Outcome <- c('Dissolved O2', 'Water pH', 'Water temperature')
+# Predictor <- c(rep('Presence of Macrophytes', 3))
+# mean <- c(-0.756,  -0.994, -0.514)
+# CI <- c('-1.021, -0.495', '-1.253 to -0.738', '-0.843 to -0.2')
+# 
+# total_mac_water <- data.frame(Outcome, Predictor, mean, CI)
+# colnames(total_mac_water) <- c('Outcome variable', 'Predictor', 'Posterior mean', '89% CI')
+# 
+# kable(total_mac_water, 'latex')
+```
+
+# Results (Part 2)
+## 3) How does vegetation cutting influence the relationships between aquatic insect abundance and water quality factors?
+```{r echo=FALSE, message=FALSE}
+# png(file="C:/Users/judy8/Box/PhD_UCD/UCD_course/Fall_2022/ECL298_Bayesian_models/Publication_Fresh_bio/Figures_tables/Interaction_gPoisson.png",
+#     width = 10, height = 5, units = "in", res = 300)
+par(mfrow = c(1,2), mar = c(5, 5, 3, 1))
+
+k <- PSIS(m_interact_tem_Coe, pointwise = TRUE)$k
+par(mar = c(5, 4, 4, 2) + 0.1)
+plot(coen$Tem, coen$A, xlab = 'Water temperature (std)', ylab = 'Counts of damselfly larvae (log scale)', bty = 'l', ylim = c(0, 60),
+     col = ifelse(coen$M == 2, 'tomato', 'grey'), cex = 1+normalize(k), pch = ifelse(k > 0.5, 16, 1))
+
+ns <- 100
+T_seq <- seq(from = -2, to = 2.5, length.out = ns)
+
+# predictions for M = 1 (no macrophytes)
+lambda_nm <-link(m_interact_tem_Coe, data = data.frame(Tem = T_seq, M = 1)) 
+lmu_nm <- apply(lambda_nm, 2, mean)
+lci_nm <- apply(lambda_nm, 2, PI)
+lines(T_seq, lmu_nm, lty = 1, col = 'grey')
+rethinking::shade(lci_nm, T_seq)
+
+# predictions for M = 2 (with macrophytes)
+lambda_m <-link(m_interact_tem_Coe, data = data.frame(Tem = T_seq, M = 2)) 
+lmu_m <- apply(lambda_m, 2, mean)
+lci_m <- apply(lambda_m, 2, PI)
+lines(T_seq, lmu_m, col = 'tomato')
+rethinking::shade(lci_m, T_seq, col = col.alpha('tomato', 0.2))
+
+legend(x = 'topleft', inset = 0.1, legend = c('Without mowing', 'With mowoing'), col = c('grey', 'tomato'), lty = c(1, 1), cex = 0.8, box.lty = 0)
+# mtext('Coenagrionidae')
+mtext('(A)', side = 3, at = c(2.5, 60))
+###############################################
+
+k <- PSIS(m_interact_tem_Chi, pointwise = TRUE)$k
+plot(chir$Tem, chir$A, xlab = 'Water temperature (std)', ylab = 'Counts of midge larvae (log scale)', bty = 'l', ylim = c(0, 80),
+     col = ifelse(chir$M == 2, 'tomato', 'grey'), 
+     cex = 1+normalize(k), pch = ifelse(k > 0.5, 16, 1))
+
+ns <- 100
+T_seq <- seq(from = -2, to = 2.5, length.out = ns)
+
+# predictions for M = 1 (no macrophytes)
+lambda_nm <-link(m_interact_tem_Chi, data = data.frame(Tem = T_seq, M = 1)) 
+lmu_nm <- apply(lambda_nm, 2, mean)
+lci_nm <- apply(lambda_nm, 2, PI)
+lines(T_seq, lmu_nm, lty = 1, col = 'grey')
+rethinking::shade(lci_nm, T_seq)
+
+# predictions for M = 2 (with macrophytes)
+lambda_m <-link(m_interact_tem_Chi, data = data.frame(Tem = T_seq, M = 2)) 
+lmu_m <- apply(lambda_m, 2, mean)
+lci_m <- apply(lambda_m, 2, PI)
+lines(T_seq, lmu_m, col = 'tomato')
+rethinking::shade(lci_m, T_seq, col = col.alpha('tomato', 0.2))
+
+# legend(x = 'topleft', inset = 0.1, legend = c('With macrophytes', 'Without macrophytes'), col = c('tomato', 'grey'), lty = c(1, 2), cex = 0.8, box.lty = 1)
+# mtext('Chironomidae')
+mtext('(B)', side = 3, at = c(2.5, 80))
+
+# dev.off()
+```
+
+## 4) How do the impacts of vegetation cutting vary over time?
+```{r echo=FALSE, message=FALSE}
+# png(file="C:/Users/judy8/Box/PhD_UCD/UCD_course/Fall_2022/ECL298_Bayesian_models/Publication_Fresh_bio/Figures_tables/variation_across_time.png",
+#     width = 10, height = 5, units = "in", res = 300)
+par(mfrow = c(1,2), mar = c(5, 5, 2, 1))
+Vis <- precis(m_Visit, 2, pars = 'b', prob = 0.9)
+Vis <- (-1)*Vis
+# labels <- paste('b[', 1:11, ']: ', sep = '')
+labels <- format(unique(aqu_ins$Date), '%b-%d')
+n = length(unique(aqul$Vis))
+
+
+plot(x = Vis$mean, y = 1:n, pch = 16, yaxt = 'n', xlab = 'Coefficient values of mowing \n on abundance', ylab = 'Date', xlim = c(-1, 2), bty = 'l')+
+  axis(2, at = c(1:n), labels = labels,  las = 2, cex = 0.5, cex.axis=0.8)
+abline(v = 0, col = col.alpha('grey', 0.3))
+  for (i in 1:n){
+    lines(y = c(rep(i, n), rep(i, n)),
+          x = c(rep(Vis$`95%`[i], n), rep(Vis$`5%`[i], n)), lwd = 2)
+    abline(h = i, lty = 2, col = col.alpha('grey', 0.3))
+  }
+mtext('(A)', side = 3, adj = 1)
+
+###################################################################
+temp_ag_vis <- aggregate(x = aqu_ins[ , c('Tem', 'Vis')], 
+                         by = list(aqu_ins$Vis), FUN = mean)
+temp_ag_vis$vis_mean <- Vis$mean
+temp_ag_vis$`5%` <- Vis$`5%`
+temp_ag_vis$`95%` <- Vis$`95%`
+
+
+plot(vis_mean ~ Tem, data = temp_ag_vis, bty = 'l', 
+     ylim = c(-1, 2), pch = 16,
+     xlab = 'Water temperature (std)', ylab = 'Coefficient values of mowing \n on abundance')
+for (i in 1:n){
+    lines(x = c(rep(temp_ag_vis$Tem[i], n), rep(temp_ag_vis$Tem[i], n)),
+          y = c(rep(temp_ag_vis$`95%`[i], n), rep(temp_ag_vis$`5%`[i], n)), lwd = 2, lty = 1, col = col.alpha('black', 1))
+}
+abline(h = 0, col = col.alpha('grey', 0.3))
+abline(lm(vis_mean ~ Tem, data = temp_ag_vis), col = 'red', lwd = 2, lty = 2)
+mtext('(B)', side = 3, adj = 1)
+# dev.off()
+```
+
+```{r}
+Vis_tem_lm <- lm(vis_mean ~ Tem, data = temp_ag_vis)
+summary(Vis_tem_lm)
+```
+
+
+## 5) How do the impacts of mowing vary over families?
+```{r}
+# png(file="C:/Users/judy8/Box/PhD_UCD/UCD_course/Fall_2022/ECL298_Bayesian_models/Publication_Fresh_bio/Figures_tables/variation_across_families.png",
+#     width = 10, height = 5, units = "in", res = 300)
+par(mfrow = c(1,1), mar = c(6.5, 4, 4, 1))
+Fam <- precis(m_family, 2, pars = 'b', prob = 0.9)
+# Fam <- (-1)*Fam
+# labels <- paste('b[', 1:11, ']: ', sep = '')
+labels <- unique(aqu_ins$Family)
+n = length(unique(aqul$Fam))
+
+
+plot(x = 1:n, y = Fam$mean, pch = 16, xaxt = 'n', ylab = 'Coefficient values of mowing macrophytes', xlab = '', ylim = c(-1.5, 1.5), bty = 'l', col = 'darkgreen', cex = 2)+
+  axis(1, at = c(1:n), labels = labels,  las = 2, cex = 2, cex.axis = 0.8)
+abline(h = 0, col = 'grey', lty = 2)
+  for (i in 1:n){
+    lines(x = c(rep(i, n), rep(i, n)),
+          y = c(rep(Fam$`95%`[i], n), rep(Fam$`5%`[i], n)), lwd = 3, col = 'darkgreen')
+    # abline(h = i, lty = 2, col = col.alpha('grey', 0.3))
+  }+
+  text(x = (1:n)+0.2, y = (Fam$mean)+0.1, labels=round(Fam$mean, 3), cex= 0.7)
+
+# dev.off()
+```
+
+
+```{r echo=FALSE, message=FALSE}
+# extract posterior means of partially pooled estimates
+# post <- extract.samples(m_VarySlopes)
+# a2 <- apply(post$a, 2, mean)
+# b2 <- apply(post$b, 2, mean)
+```
+
+```{r echo = FALSE, results='hide', out.width="70%"}
+# dens(post$Rho[,1,2], xlim = c(-1, 1), xlab = 'Correlation',
+#      bty = 'l', col = rangi2, lwd = 2) # posterior
+# R <- rlkjcorr(1e4, K = 2, eta = 2) # prior
+# dens(R[,1,2], col = 'grey', add = TRUE, lty = 2, lwd = 2)
+# mtext('Posterior distribution of the correlation \n between intercepts and slopes')
+# text(-0.2, 1.5, 'posterior', col = rangi2)
+# text(0.5, 0.75, 'prior', col = 'grey')
+```
+
+```{r echo=FALSE, message=FALSE}
+# plot(a2, b2, pch = 16, col = col.alpha('navy', 0.4), 
+#      xlab = 'Intercept (a)', ylab = 'Slope (b)', 
+#      xlim = c(0, 3))+
+#   abline(h = 0, lty = 2)+
+#   abline(v = 0, lty = 2)
+# 
+# # compute posterior mean bivariate Gaussian
+# Mu_est <- c(mean(post$a_bar), mean(post$b_bar))
+# rho_est <- mean(post$Rho[,1,2])
+# sa_est <- mean(post$sigma_visit[,1])
+# sb_est <- mean(post$sigma_visit[,2])
+# cov_ab <- sa_est*sb_est*rho_est
+# Sigma_est <- matrix(c(sa_est^2, cov_ab, cov_ab, sb_est^2), ncol = 2)
+# 
+# for (l in c(0.1, 0.3, 0.5, 0.8, 0.99)) 
+#   lines(ellipse(Sigma_est, centre = Mu_est, level = l), col = col.alpha('black', 0.2))
+```
+
+```{r echo=FALSE, message=FALSE}
+# no_mac <- exp(a2)
+# mac <- exp(a2+b2)
+# 
+# plot(no_mac, mac, xlim = c(0, 20), ylim = c(0, 20),
+#      xlab = 'macrophytes = 0', ylab = 'macrophytes = 1',
+#      bty = 'l', col = col.alpha('navy', 0.4), pch = 16)
+# mtext('Aquatic insect abundance')
+# abline(h = 0.5, col = 'grey', lty = 2)
+# abline(v = 0.5, col = 'grey', lty = 2)
+```
+
+```{r}
+month <- strftime(aqu_ins$Date, '%m')
+dd <- data.frame(month, aqu_ins$water.temp..C., aqu_ins$DO.mg..L.)
+colnames(dd) <- c('month', 'temp', 'do')
+
+aggregate(dd[,c('do', 'temp')], list(dd[, 'month']), mean)
+```
+
+# MCMC diagnostics
+```{r echo=FALSE, message=FALSE}
+mcmc_diagnose <- function(model, model_precis){
+  print(model_precis)
+  print(traceplot(model, pars = rownames(model_precis)))
+  print(trankplot(model, pars = rownames(model_precis)))
+}
+```
+
+## Total impacts of mac on insects
+```{r echo=FALSE, message=FALSE}
+mcmc_diagnose(m_t_mac_abuncance, m_t_mac_abuncance_precis)
+mcmc_diagnose(m_t_mac_abuncance_coen, m_t_mac_abuncance_coen_precis)
+mcmc_diagnose(m_t_mac_abuncance_chir, m_t_mac_abuncance_chir_precis)
+```
+
+## Direct impacts of mac on insects
+```{r echo=FALSE, message=FALSE}
+mcmc_diagnose(m_d_mac_abuncance, m_d_mac_abuncance_precis)
+mcmc_diagnose(m_d_mac_abuncance_coen, m_d_mac_abuncance_coen_precis)
+mcmc_diagnose(m_d_mac_abuncance_chir, m_d_mac_abuncance_chir_precis)
+```
+
+## Direct impacts of water quality on insects
+```{r echo=FALSE, message=FALSE}
+mcmc_diagnose(m_d_do_abuncance, m_d_do_abuncance_precis)
+mcmc_diagnose(m_d_tem_abundance_coen, m_d_tem_abundance_coen_precis)
+```
+
